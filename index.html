@@ -1,1 +1,299 @@
+<!DOCTYPE html>
+<html lang="am" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>የጋራ ኸትም እና ዚክር</title>
+  <!-- Telegram Web App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <style>
+    :root {
+      --bg: #121514;
+      --card: #1b221f;
+      --primary: #14533c;
+      --gold: #eab308;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --open: #242d29;
+      --taken: #854d0e;
+      --done: #15803d;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 16px;
+      padding-bottom: 40px;
+      user-select: none;
+    }
+    .header {
+      background: linear-gradient(135deg, var(--primary), #0d3828);
+      border: 1px solid rgba(234, 179, 8, 0.3);
+      border-radius: 16px;
+      padding: 18px;
+      text-align: center;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .header h1 { font-size: 1.25rem; color: var(--gold); margin-bottom: 6px; }
+    .header p { font-size: 0.85rem; color: #e2e8f0; }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      background: var(--card);
+      padding: 6px;
+      border-radius: 12px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .tab-btn.active {
+      background: var(--primary);
+      color: var(--gold);
+    }
+
+    .progress-box {
+      background: var(--card);
+      padding: 14px;
+      border-radius: 14px;
+      margin-bottom: 16px;
+    }
+    .progress-stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      margin-bottom: 8px;
+    }
+    .bar-bg {
+      height: 10px;
+      background: #0f1312;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--gold), #22c55e);
+      transition: width 0.4s ease;
+    }
+    .legend {
+      display: flex;
+      justify-content: space-around;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .juz-card {
+      background: var(--open);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.15s, background 0.2s;
+    }
+    .juz-card:active { transform: scale(0.96); }
+    .juz-card.taken {
+      background: rgba(234, 179, 8, 0.18);
+      border-color: var(--gold);
+    }
+    .juz-card.done {
+      background: rgba(34, 197, 94, 0.2);
+      border-color: #22c55e;
+    }
+    .juz-num { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+    .juz-status { font-size: 0.75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .juz-card.taken .juz-status { color: var(--gold); }
+    .juz-card.done .juz-status { color: #4ade80; }
+
+    /* Zikr Section */
+    .zikr-box {
+      display: none;
+      background: var(--card);
+      border-radius: 16px;
+      padding: 24px 16px;
+      text-align: center;
+    }
+    .arabic { font-size: 1.5rem; color: var(--gold); margin-bottom: 10px; line-height: 1.6; }
+    .meaning { font-size: 0.9rem; color: var(--muted); margin-bottom: 24px; }
+    .counter-circle {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--primary), #0b2e21);
+      border: 3px solid var(--gold);
+      color: var(--text);
+      font-size: 2rem;
+      font-weight: 800;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      cursor: pointer;
+      box-shadow: 0 0 25px rgba(234, 179, 8, 0.25);
+    }
+    .counter-circle span { font-size: 0.75rem; font-weight: 400; color: var(--gold); margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>📖 የጋራ ኸትም እና ዚክር</h1>
+    <p id="welcome-user">አሰላሙ ዓለይኩም! የሚቀሩትን ጁዝ ይምረጡ</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('khatm')">📖 የቁርአን ኸትም</button>
+    <button class="tab-btn" onclick="switchTab('zikr')">📿 የጋራ ዚክር</button>
+  </div>
+
+  <!-- KHATM TAB -->
+  <div id="khatm-section">
+    <div class="progress-box">
+      <div class="progress-stats">
+        <span>አጠቃላይ ሂደት</span>
+        <strong id="progress-text" style="color: var(--gold);">0 / 30 (0%)</strong>
+      </div>
+      <div class="bar-bg"><div class="bar-fill" id="progress-bar"></div></div>
+      <div class="legend">
+        <span>⬜ ክፍት</span>
+        <span>🟨 የተያዘ</span>
+        <span>✅ የተጠናቀቀ</span>
+      </div>
+    </div>
+
+    <div class="grid" id="juz-grid"></div>
+  </div>
+
+  <!-- ZIKR TAB -->
+  <div id="zikr-section" class="zikr-box">
+    <div class="arabic">أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ</div>
+    <div class="meaning">«ታላቁን አላህ ምሕረትን እጠይቃለሁ፤ ወደ እርሱም በተውባ እመለሳለሁ።»</div>
+    <button class="counter-circle" onclick="incrementZikr()">
+      <div id="zikr-count">0</div>
+      <span>ይንኩ / ዚክር</span>
+    </button>
+    <p style="font-size: 0.8rem; color: var(--muted);">የሁሉም የቻናሉ ቤተሰቦች ድምር ዚክር በቀጥታ ይቆጠራል</p>
+  </div>
+
+  <script>
+    // 1. Telegram Web App Setup
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.ready();
+
+    const user = tg.initDataUnsafe?.user || { id: Math.floor(Math.random() * 100000), first_name: "አንባቢ" };
+    document.getElementById("welcome-user").innerText = `አሰላሙ ዓለይኩም፣ ${user.first_name}! የሚቀሩትን ጁዝ ይምረጡ`;
+
+    // 2. Firebase Setup
+    firebase.initializeApp({
+      databaseURL: "https://islamic-7074d-default-rtdb.firebaseio.com"
+    });
+    const db = firebase.database();
+    const khatmRef = db.ref("khatm_board");
+    const zikrRef = db.ref("shared_zikr");
+
+    // 3. Listen to Khatm Board Changes Live
+    khatmRef.on("value", (snapshot) => {
+      const state = snapshot.val() || {};
+      renderGrid(state);
+    });
+
+    function renderGrid(state) {
+      const grid = document.getElementById("juz-grid");
+      grid.innerHTML = "";
+      let doneCount = 0;
+
+      for (let i = 1; i <= 30; i++) {
+        const item = state[i] || { status: "open", name: "" };
+        if (item.status === "done") doneCount++;
+
+        const card = document.createElement("div");
+        card.className = `juz-card ${item.status !== 'open' ? item.status : ''}`;
+        
+        let icon = "⬜ ክፍት";
+        if (item.status === "taken") icon = `🟨 ${item.name}`;
+        if (item.status === "done") icon = `✅ ${item.name}`;
+
+        card.innerHTML = `
+          <div class="juz-num">ጁዝ ${i}</div>
+          <div class="juz-status">${icon}</div>
+        `;
+        card.onclick = () => handleJuzClick(i, item);
+        grid.appendChild(card);
+      }
+
+      const pct = Math.round((doneCount / 30) * 100);
+      document.getElementById("progress-text").innerText = `${doneCount} / 30 (${pct}%)`;
+      document.getElementById("progress-bar").style.width = `${pct}%`;
+    }
+
+    function handleJuzClick(num, current) {
+      if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+
+      if (!current || current.status === "open") {
+        khatmRef.child(num).set({
+          status: "taken",
+          uid: user.id,
+          name: user.first_name
+        });
+      } else if (current.uid === user.id && current.status === "taken") {
+        khatmRef.child(num).update({ status: "done" });
+        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+      } else if (current.uid === user.id && current.status === "done") {
+        if (confirm(`ጁዝ ${num}ን ጨርሰዋል። እንደገና ክፍት ማድረግ ይፈልጋሉ?`)) {
+          khatmRef.child(num).set({ status: "open", name: "" });
+        }
+      } else {
+        alert(`ጁዝ ${num} በ ${current.name} ${current.status === 'taken' ? 'ተይዟል' : 'ተጠናቋል'}።`);
+      }
+    }
+
+    // 4. Listen to Shared Zikr Live
+    zikrRef.on("value", (snapshot) => {
+      document.getElementById("zikr-count").innerText = snapshot.val() || 0;
+    });
+
+    function incrementZikr() {
+      if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
+      zikrRef.transaction((current) => (current || 0) + 1);
+    }
+
+    // Tab Switcher
+    function switchTab(tab) {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      if (tab === "khatm") {
+        document.querySelectorAll(".tab-btn")[0].classList.add("active");
+        document.getElementById("khatm-section").style.display = "block";
+        document.getElementById("zikr-section").style.display = "none";
+      } else {
+        document.querySelectorAll(".tab-btn")[1].classList.add("active");
+        document.getElementById("khatm-section").style.display = "none";
+        document.getElementById("zikr-section").style.display = "block";
+      }
+    }
+  </script>
+</body>
+</html>
 
